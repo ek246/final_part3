@@ -47,19 +47,19 @@ def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
                             detail="Invalid username or password.")
     return user
 "Browse calculations"
-@app.get("/calculations", response_model=list[CalculationRead], tags=["calculations"])
+@app.get("/calculations", response_model=list[CalculationRead], status_code=status.HTTP_200_OK, tags=["calculations"])
 def list_calculations(db: Session = Depends(get_db)):
     calculations = db.execute(select(Calculator)).scalars().all()
     return calculations
 "Retrieve a specific calculation by ID"
-@app.get("/calculations/{id}", response_model=CalculationRead, tags=["calculations"])
+@app.get("/calculations/{id}", response_model=CalculationRead, status_code=status.HTTP_200_OK, tags=["calculations"])
 def get_calculation(id: int, db: Session = Depends(get_db)):
     calculation = db.get(Calculator, id)
     if calculation is None:
         raise HTTPException(status_code=404, detail="This calculation does not exist")
     return calculation
 "Update a specific calculation by ID"
-@app.put("/calculations/{id}", response_model=CalculationRead, tags=["calculations"])
+@app.put("/calculations/{id}", response_model=CalculationRead, status_code=status.HTTP_200_OK, tags=["calculations"])
 def update_calculation(id: int, calculation_data: CalculationCreate, db:
                        session = Depends(get_db)):
     operation = db.get(Calculator, id)
@@ -75,7 +75,24 @@ def update_calculation(id: int, calculation_data: CalculationCreate, db:
     db.commit()
     db.refresh(operation)
     return operation
-
+"Add a new calculation"
+@app.post("/calculations", response_model=CalculationRead, status_code=status.HTTP_201_CREATED, tags=["calculations"])
+def create_calculation(calculation_data: CalculationCreate, db: Session = Depends(get_db)):
+    new_calculation = CalculatorFactory.create(user_id=calculation_data.user_id, type=calculation_data.type,
+                                               a=calculation_data.a, b=calculation_data.b)
+    db.add(new_calculation)
+    db.commit()
+    db.refresh(new_calculation)
+    return new_calculation
+"Delete a calculation by ID"
+@app.delete("/calculations/{id}", status_code=status.HTTP_204_NO_CONTENT, tags=["calculations"])
+def delete_calculations(id: int, db: Session = Depends(get_db)):
+    calculation = db.get(Calculator, id)
+    if calculation is None:
+        raise HTTPException(status_code=404, detail="This calculation does not exist")
+    db.delete(calculation)
+    db.commit()
+    return {"detail": "Calculation deleted successfully."}
     
 
 @app.get("/health")
