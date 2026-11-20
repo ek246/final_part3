@@ -6,6 +6,10 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
 class UserRead(BaseModel):
     model_config= ConfigDict(from_attributes=True)
 
