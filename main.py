@@ -1,6 +1,13 @@
 # main.py
+from requests import session
+from sqlalchemy.orm import Session, IntegrityError, select
+from app.database import get_db
+from app.models.users import Users
+from app.models.calculator import Calculator, CalculatorFactory
+from app.schemas.userSchema import UserCreate, UserRead, UserLogin
+from app.schemas.calculatorSchema import CalculationRead, CalculationCreate
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends, status 
 from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator  # Use @validator for Pydantic 1.x
@@ -9,11 +16,67 @@ from app.operations import add, subtract, multiply, divide  # Ensure correct imp
 import uvicorn
 import logging
 
+
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 app = FastAPI()
+
+@app.post("/users/register", response_model=UserRead, status_code=status.HTTP_201_CREATED, tags = ["auth"])
+def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
+    user = Users(username=user_data.username, email=str(user_data.email),
+                 password_hash=Users.hash_password(user_data.password))
+    # User Registration endpoint
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        if getattr(e.orig, 'pgcode', None) == '23505':
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail="Username or email already exists.") from e
+        raise 
+    db.refresh(user)
+    return user
+@app.post("/users/login", response_model=UserRead, tags = ["auth"])
+def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
+    user = db.execute(select(Users).where(Users.username == login_data.username)).scalar_one_or_none()
+    if not user or not user.verify_password(login_data.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Invalid username or password.")
+    return user
+"Browse calculations"
+@app.get("/calculations", response_model=list[CalculationRead], tags=["calculations"])
+def list_calculations(db: Session = Depends(get_db)):
+    calculations = db.execute(select(Calculator)).scalars().all()
+    return calculations
+"Retrieve a specific calculation by ID"
+@app.get("/calculations/{id}", response_model=CalculationRead, tags=["calculations"])
+def get_calculation(id: int, db: Session = Depends(get_db)):
+    calculation = db.get(Calculator, id)
+    if calculation is None:
+        raise HTTPException(status_code=404, detail="This calculation does not exist")
+    return calculation
+"Update a specific calculation by ID"
+@app.put("/calculations/{id}", response_model=CalculationRead, tags=["calculations"])
+def update_calculation(id: int, calculation_data: CalculationCreate, db:
+                       session = Depends(get_db)):
+    operation = db.get(Calculator, id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="This calculation does not exist")
+    new_data = CalculatorFactory.create(user_id=operation.user_id, type=calculation_data.type,
+                                        a=calculation_data.a, b=calculation_data.b)
+    operation.a = new_data.a
+    operation.b = new_data.b
+    operation.type = new_data.type
+    operation.result = new_data.result
+
+    db.commit()
+    db.refresh(operation)
+    return operation
+
+    
 
 @app.get("/health")
 def health_check():
