@@ -13,6 +13,9 @@ class CalculationCreate(BaseModel):
             raise ValueError("Cannot divide by zero")
         return self
 
+class CalculationAdd(CalculationCreate):
+    user_id: int
+
 class CalculationRead(BaseModel):
    # Validate that division by zero does not occur after the model is created
    id: int
