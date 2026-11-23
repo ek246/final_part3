@@ -8,8 +8,20 @@ import requests
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from fastapi.testclient import TestClient 
+from main import app
+from app.database import get_db
 
-
+@pytest.fixture
+def client(db_session):
+    def override_get_db():
+        yield db_session
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 @pytest.fixture
 def db_session():
     database_url = os.environ["TEST_DATABASE_URL"]
@@ -64,7 +76,7 @@ def fastapi_server():
                 server_up = True
                 print("FastAPI server is up and running.")
                 break
-        except requests.exceptions.ConnectionError:
+        except (requests.exceptions.ConnectionError):
             pass
         time.sleep(1)
     
