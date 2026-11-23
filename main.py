@@ -1,11 +1,13 @@
 # main.py
-from requests import session
-from sqlalchemy.orm import Session, IntegrityError, select
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.users import Users
 from app.models.calculator import Calculator, CalculatorFactory
 from app.schemas.userSchema import UserCreate, UserRead, UserLogin
-from app.schemas.calculatorSchema import CalculationRead, CalculationCreate
+from app.schemas.calculatorSchema import CalculationRead, CalculationCreate, CalculationAdd
 
 from fastapi import FastAPI, HTTPException, Request, Depends, status 
 from fastapi.responses import JSONResponse
@@ -61,7 +63,7 @@ def get_calculation(id: int, db: Session = Depends(get_db)):
 "Update a specific calculation by ID"
 @app.put("/calculations/{id}", response_model=CalculationRead, status_code=status.HTTP_200_OK, tags=["calculations"])
 def update_calculation(id: int, calculation_data: CalculationCreate, db:
-                       session = Depends(get_db)):
+                       Session = Depends(get_db)):
     operation = db.get(Calculator, id)
     if operation is None:
         raise HTTPException(status_code=404, detail="This calculation does not exist")
@@ -77,7 +79,9 @@ def update_calculation(id: int, calculation_data: CalculationCreate, db:
     return operation
 "Add a new calculation"
 @app.post("/calculations", response_model=CalculationRead, status_code=status.HTTP_201_CREATED, tags=["calculations"])
-def create_calculation(calculation_data: CalculationCreate, db: Session = Depends(get_db)):
+def create_calculation(calculation_data: CalculationAdd, db: Session = Depends(get_db)):
+    if db.get(Users, calculation_data.user_id) is None:
+        raise HTTPException(status_code=404, detail="User not found")
     new_calculation = CalculatorFactory.create(user_id=calculation_data.user_id, type=calculation_data.type,
                                                a=calculation_data.a, b=calculation_data.b)
     db.add(new_calculation)

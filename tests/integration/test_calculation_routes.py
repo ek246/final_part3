@@ -1,7 +1,7 @@
 from http import client
 
 from sqlalchemy import select
-from app.schemas.calculatorSchema import CalculationCreate, CalculationRead, CalculationAdd
+from app.schemas.calculatorSchema import CalculationCreate, CalculationRead
 from app.models import Calculator, Users
 
 def test_list_calculations(client, db_session):
